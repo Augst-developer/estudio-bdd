@@ -1,0 +1,262 @@
+### =====================================================================
+### Estúdio BDD — roteiro de verificação (extensão REST Client do VS Code)
+### Como usar: clique em "Send Request" acima de cada bloco, na ordem.
+### Pré-requisitos: API no ar e banco com os dados fictícios iniciais
+### (usuário 1 = Ana, 2 = Bruno; história 1 = pronta para exportar,
+###  2 = com sugestão pendente, 3 = do Bruno e sem cenários).
+### Se rodar o arquivo uma segunda vez, mude o título do caso 1 (senão dá 409).
+### =====================================================================
+
+@base = http://localhost:8080/api
+@json = application/json
+
+
+### ---------- 1. História válida (esperado: 201) ----------
+# @name historiaNova
+POST {{base}}/projetos/1/historias
+Content-Type: {{json}}
+X-Usuario-Id: 1
+
+{
+  "titulo": "Aplicar cupom de desconto",
+  "papel": "cliente da loja",
+  "objetivo": "aplicar um cupom ao meu pedido",
+  "beneficio": "pagar menos na compra",
+  "prioridade": "ALTA"
+}
+
+### ---------- 2. Título repetido no projeto (esperado: 409) ----------
+POST {{base}}/projetos/1/historias
+Content-Type: {{json}}
+X-Usuario-Id: 1
+
+{
+  "titulo": "Aplicar cupom de desconto",
+  "papel": "cliente da loja",
+  "objetivo": "aplicar um cupom ao meu pedido",
+  "beneficio": "pagar menos na compra",
+  "prioridade": "ALTA"
+}
+
+### ---------- 3. Narrativa incompleta, sem benefício (esperado: 400 com "erros.beneficio") ----------
+POST {{base}}/projetos/1/historias
+Content-Type: {{json}}
+X-Usuario-Id: 1
+
+{
+  "titulo": "História incompleta",
+  "papel": "cliente da loja",
+  "objetivo": "algo",
+  "prioridade": "BAIXA"
+}
+
+
+### ---------- 4. Cenário válido na história 3, pelo autor Bruno (esperado: 201, posições 1..3) ----------
+# @name cenarioOk
+POST {{base}}/historias/3/cenarios
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "titulo": "Listar pedidos anteriores",
+  "passos": [
+    { "tipo": "DADO",   "texto": "que fiz 2 pedidos" },
+    { "tipo": "QUANDO", "texto": "abro o histórico de pedidos" },
+    { "tipo": "ENTAO",  "texto": "vejo os 2 pedidos" }
+  ]
+}
+
+### ---------- 5. Sem Quando (esperado: 422 "ao menos um passo Quando") ----------
+POST {{base}}/historias/3/cenarios
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "titulo": "Sem quando",
+  "passos": [
+    { "tipo": "DADO",  "texto": "a" },
+    { "tipo": "ENTAO", "texto": "b" }
+  ]
+}
+
+### ---------- 6. Sem Então (esperado: 422 "ao menos um passo Então") ----------
+POST {{base}}/historias/3/cenarios
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "titulo": "Sem então",
+  "passos": [
+    { "tipo": "DADO",   "texto": "a" },
+    { "tipo": "QUANDO", "texto": "b" }
+  ]
+}
+
+### ---------- 7. Fora de ordem (esperado: 422 "fora de ordem") ----------
+POST {{base}}/historias/3/cenarios
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "titulo": "Fora de ordem",
+  "passos": [
+    { "tipo": "QUANDO", "texto": "a" },
+    { "tipo": "DADO",   "texto": "b" },
+    { "tipo": "ENTAO",  "texto": "c" }
+  ]
+}
+
+### ---------- 8. Iniciado por E (esperado: 422 "não pode começar") ----------
+POST {{base}}/historias/3/cenarios
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "titulo": "Começa com E",
+  "passos": [
+    { "tipo": "E",      "texto": "a" },
+    { "tipo": "QUANDO", "texto": "b" },
+    { "tipo": "ENTAO",  "texto": "c" }
+  ]
+}
+
+### ---------- 9a. Editar o cenário do caso 4 trocando os passos ----------
+PUT {{base}}/cenarios/{{cenarioOk.response.body.id}}
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "titulo": "Listar pedidos anteriores",
+  "passos": [
+    { "tipo": "DADO",   "texto": "que fiz 2 pedidos" },
+    { "tipo": "E",      "texto": "que um deles foi cancelado" },
+    { "tipo": "QUANDO", "texto": "abro o histórico de pedidos" },
+    { "tipo": "ENTAO",  "texto": "vejo os 2 pedidos" },
+    { "tipo": "E",      "texto": "o cancelado aparece marcado" }
+  ]
+}
+
+### ---------- 9b. Conferir a ordem (esperado: passos na ordem enviada, posições 1..5) ----------
+GET {{base}}/cenarios/{{cenarioOk.response.body.id}}
+
+
+### ---------- 10. Editar história de outro autor (esperado: 403) ----------
+PUT {{base}}/historias/1
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "titulo": "Adicionar produto ao carrinho",
+  "papel": "cliente da loja",
+  "objetivo": "alterado por quem não é autor",
+  "beneficio": "x",
+  "prioridade": "ALTA"
+}
+
+### ---------- 11a. Excluir história de outro autor (esperado: 403) ----------
+DELETE {{base}}/historias/1
+X-Usuario-Id: 2
+
+### ---------- 11b. Excluir cenário de outro autor (esperado: 403) ----------
+DELETE {{base}}/cenarios/1
+X-Usuario-Id: 2
+
+### ---------- 12. Sem cabeçalho de usuário (esperado: 401) ----------
+PUT {{base}}/historias/1
+Content-Type: {{json}}
+
+{
+  "titulo": "Adicionar produto ao carrinho",
+  "papel": "cliente da loja",
+  "objetivo": "x",
+  "beneficio": "y",
+  "prioridade": "ALTA"
+}
+
+
+### ---------- 13. Registrar sugestão na história 3 (esperado: 201, decisao PENDENTE) ----------
+# @name sugestaoA
+POST {{base}}/historias/3/sugestoes
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "ferramenta": "Assistente de IA (exemplo)",
+  "prompt": "Sugira cenários de borda para o histórico de pedidos.",
+  "conteudo": "Cenário: cliente sem pedidos vê a mensagem 'Nenhum pedido encontrado'."
+}
+
+### ---------- 14. Aceitar (esperado: 200, ACEITA; os cenários não mudam) ----------
+POST {{base}}/sugestoes/{{sugestaoA.response.body.id}}/aceitar
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{ "justificativa": "Cobre um caso de borda relevante." }
+
+### ---------- 15a. Registrar outra sugestão ----------
+# @name sugestaoB
+POST {{base}}/historias/3/sugestoes
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "ferramenta": "Assistente de IA (exemplo)",
+  "prompt": "Avalie a história.",
+  "conteudo": "O sistema deve ser rápido."
+}
+
+### ---------- 15b. Rejeitar com motivo (esperado: 200, REJEITADA, motivoRejeicao GENERICA) ----------
+POST {{base}}/sugestoes/{{sugestaoB.response.body.id}}/rejeitar
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{ "motivo": "GENERICA", "justificativa": "Vago, sem exemplo concreto." }
+
+### ---------- 16a. Registrar uma terceira sugestão (fica pendente) ----------
+# @name sugestaoC
+POST {{base}}/historias/3/sugestoes
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{
+  "ferramenta": "Assistente de IA (exemplo)",
+  "prompt": "Mais ideias.",
+  "conteudo": "Cenário: filtrar pedidos por data."
+}
+
+### ---------- 16b. Rejeitar SEM motivo (esperado: 400) ----------
+POST {{base}}/sugestoes/{{sugestaoC.response.body.id}}/rejeitar
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{ "justificativa": "sem motivo" }
+
+### ---------- 17. Alterar sugestão já decidida: aceitar a do caso 14 de novo (esperado: 409) ----------
+POST {{base}}/sugestoes/{{sugestaoA.response.body.id}}/aceitar
+Content-Type: {{json}}
+X-Usuario-Id: 2
+
+{ "justificativa": "tentando de novo" }
+
+
+### ---------- 18. Exportar história sem cenários, a do caso 1 (esperado: 422) ----------
+GET {{base}}/historias/{{historiaNova.response.body.id}}/feature
+
+### ---------- 19. Exportar história 2, com sugestão pendente (esperado: 422 "pendente(s)") ----------
+GET {{base}}/historias/2/feature
+
+### ---------- 20. Exportar história 1 (esperado: 200 e texto igual a docs/exemplo.feature) ----------
+GET {{base}}/historias/1/feature
+
+
+### ---------- 21. Resumo do projeto (conferir com os dados cadastrados) ----------
+GET {{base}}/projetos/1/resumo
+
+### ---------- 22a. Consulta do projeto, todas as histórias ----------
+GET {{base}}/projetos/1/historias
+
+### ---------- 22b. Consulta filtrada (esperado: só histórias de prioridade ALTA) ----------
+GET {{base}}/projetos/1/historias?prioridade=ALTA
+
+### ---------- 23. Persistência: pare a API, suba de novo e rode este GET (dados mantidos) ----------
+GET {{base}}/projetos/1/historias
