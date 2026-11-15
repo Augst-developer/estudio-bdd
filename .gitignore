@@ -1,0 +1,9 @@
+# Compilação e dependências
+backend/target/
+frontend/node_modules/
+frontend/dist/
+# Credenciais e IDE
+.env
+*.log
+.idea/
+.vscode/
