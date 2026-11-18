@@ -10,6 +10,7 @@ _Projeto da disciplina Programação de Sistemas II (2026/2)_
 
 * **José Augusto Serra Mota** - RA: 10750142
 * **Pedro Henrique da Silva Araujo** - RA: 10442579
+* **Pedro Henrique Germano Kihara** - RA: 10737627
 
 
 ## Estrutura
