@@ -51,6 +51,10 @@ npm run dev           # http://localhost:5173
 ```
 A SPA usa `http://localhost:8080/api` (altere com `VITE_API_URL`). O CORS da API aceita **somente** a origem `http://localhost:5173`.
 
+## Executar no GitHub Codespaces (alternativa ao PC local)
+
+[Passo a passo para executar no GitHub Codespaces](/docs/secao-codespaces.md)
+
 ## Identidade simulada e limitações
 A API identifica o usuário pelo cabeçalho `X-Usuario-Id` e os serviços validam a autoria. **Isso não é
 autenticação**: não há senha nem token, e qualquer cliente pode enviar o id de outro usuário. Serve apenas
